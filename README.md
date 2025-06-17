@@ -1,0 +1,2 @@
+# Termitas
+AI Terminal Agent
