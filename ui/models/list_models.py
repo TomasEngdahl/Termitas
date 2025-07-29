@@ -94,8 +94,12 @@ class ListModels:
         tags_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
         tags_frame.pack(fill="x", padx=10, pady=5)
 
-        tags_label = ctk.CTkLabel(tags_frame, text="🏷️ Quick tags:", font=(config.body_font, 12))
-        tags_label.pack(side="left", padx=(0, 10))
+        # Create icon and text separately to control spacing
+        tags_icon = ctk.CTkLabel(tags_frame, text="🏆", font=(config.body_font, 12))
+        tags_icon.pack(side="left")
+        
+        tags_text = ctk.CTkLabel(tags_frame, text="Quick tags:", font=(config.body_font, 12))
+        tags_text.pack(side="left", padx=(1, 5))
 
         # Popular model family tags
         model_tags = [
@@ -313,14 +317,21 @@ class ListModels:
         header_frame = ctk.CTkFrame(info_frame, fg_color="transparent")
         header_frame.pack(fill="x")
         
-        # Model name and index
+        # Model name and index (truncate if too long)
+        full_name = f"{index}. {model.modelId}"
+        display_name = self.truncate_model_name(full_name, max_length=50)
+        
         name_label = ctk.CTkLabel(
             header_frame,
-            text=f"{index}. {model.modelId}",
+            text=display_name,
             font=(config.body_font, 14, "bold"),
             text_color=config.header_font_color
         )
         name_label.pack(side="left", anchor="w")
+        
+        # Add tooltip if name was truncated
+        if display_name != full_name:
+            self.create_tooltip(name_label, model.modelId)
         
         # Compatibility info (if VRAM detected)
         if self.vram_info and self.vram_info.get("total_vram_gb", 0) > 0:
@@ -438,6 +449,67 @@ class ListModels:
                 return param_count
         
         return None
+
+    def truncate_model_name(self, name: str, max_length: int = 50) -> str:
+        """Truncate model name if it's too long."""
+        if len(name) <= max_length:
+            return name
+        return name[:max_length-3] + "..."
+
+    def create_tooltip(self, widget, text: str):
+        """Create a tooltip for a widget."""
+        tooltip_window = None
+        
+        def show_tooltip(event):
+            nonlocal tooltip_window
+            # Hide any existing tooltip first
+            hide_tooltip(None)
+            
+            # Create tooltip window
+            tooltip_window = ctk.CTkToplevel()
+            tooltip_window.wm_overrideredirect(True)
+            tooltip_window.configure(fg_color="#2b2b2b")
+            
+            # Position tooltip near cursor
+            x = event.x_root + 10
+            y = event.y_root + 10
+            tooltip_window.geometry(f"+{x}+{y}")
+            
+            # Add text to tooltip
+            label = ctk.CTkLabel(
+                tooltip_window,
+                text=text,
+                font=(config.body_font, 11),
+                text_color="#ffffff",
+                fg_color="#2b2b2b"
+            )
+            label.pack(padx=8, pady=4)
+            
+        def hide_tooltip(event):
+            nonlocal tooltip_window
+            if tooltip_window:
+                try:
+                    tooltip_window.destroy()
+                except:
+                    pass
+                tooltip_window = None
+        
+        def hide_on_motion(event):
+            # Hide tooltip if mouse moves significantly away
+            if tooltip_window:
+                try:
+                    # Get current mouse position relative to widget
+                    x, y = event.x, event.y
+                    # If mouse is outside widget bounds, hide tooltip
+                    if x < 0 or y < 0 or x > widget.winfo_width() or y > widget.winfo_height():
+                        hide_tooltip(event)
+                except:
+                    pass
+        
+        # Bind mouse events
+        widget.bind("<Enter>", show_tooltip)
+        widget.bind("<Leave>", hide_tooltip)
+        widget.bind("<Motion>", hide_on_motion)
 
     def download_model(self, model):
         """Placeholder for model download functionality."""
