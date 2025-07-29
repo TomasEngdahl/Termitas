@@ -22,26 +22,40 @@ class ListModels:
         # System info
         self.vram_info = None
         self.system_label = None
+        
+        # Collapsible functionality
+        self.is_expanded = True
+        self.content_frame = None
+        self.header_label = None
+        self.outer_frame = None  # Will be set by options_window
 
     def create_list_models(self):
         # Detect VRAM at startup
         self.detect_system_info()
         
-        self.label_with_border = LabelWithBorder(
-            self.app,
-            self.frame,
-            text="Model Browser & Downloader",
+        # Header with collapse/expand functionality
+        self.header_frame = ctk.CTkFrame(self.frame, fg_color="transparent", height=40)
+        self.header_frame.pack(fill="x", padx=5, pady=5)
+        self.header_frame.pack_propagate(False)
+
+        # Clickable header label
+        self.header_label = ctk.CTkLabel(
+            self.header_frame,
+            text="➖ Model Browser & Downloader",
             font=(config.header_font, 16),
             text_color=config.blue,
-            border_color=config.blue,
-            corner_radius=5,
-            anchor="w"
+            cursor="hand2"
         )
-        self.label_with_border.create_label_with_border()
+        self.header_label.pack(side="left", anchor="w")
+        self.header_label.bind("<Button-1>", self.toggle_section)
+
+        # Create content frame to hold all the existing content
+        self.content_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
+        self.content_frame.pack(fill="both", expand=True, padx=5, pady=(0, 5))
 
         # System info display
-        system_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
-        system_frame.pack(fill="x", padx=10, pady=2)
+        system_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        system_frame.pack(fill="x", padx=0, pady=2)
 
         self.system_label = ctk.CTkLabel(
             system_frame,
@@ -52,8 +66,8 @@ class ListModels:
         self.system_label.pack(anchor="w")
 
         # Search controls frame
-        search_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
-        search_frame.pack(fill="x", padx=10, pady=5)
+        search_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        search_frame.pack(fill="x", padx=0, pady=5)
 
         # Search bar
         search_label = ctk.CTkLabel(search_frame, text="🔍 Search:", font=(config.body_font, 12))
@@ -91,8 +105,8 @@ class ListModels:
         popular_button.pack(side="left", padx=5)
 
         # Tag buttons frame
-        tags_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
-        tags_frame.pack(fill="x", padx=10, pady=5)
+        tags_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        tags_frame.pack(fill="x", padx=0, pady=5)
 
         # Create icon and text separately to control spacing
         tags_icon = ctk.CTkLabel(tags_frame, text="🏆", font=(config.body_font, 12))
@@ -132,10 +146,31 @@ class ListModels:
             self.tag_buttons[tag_name] = button
 
         # Create the persistent scrollable frame
-        self.scrollable_frame = ctk.CTkScrollableFrame(self.frame)
-        self.scrollable_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.scrollable_frame = ctk.CTkScrollableFrame(self.content_frame)
+        self.scrollable_frame.pack(fill="both", expand=True, padx=0, pady=10)
         
         self.show_initial_message()
+
+    def toggle_section(self, event=None):
+        """Toggle the visibility of the content section."""
+        if self.is_expanded:
+            # Collapse - hide content and make frame small
+            self.content_frame.pack_forget()
+            self.header_label.configure(text="➕ Model Browser & Downloader")
+            self.is_expanded = False
+            # Change outer frame to small height
+            if self.outer_frame:
+                self.outer_frame.pack_forget()
+                self.outer_frame.pack(fill="x", padx=0, pady=(2, 5))
+        else:
+            # Expand - show content and make frame take remaining space
+            self.content_frame.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+            self.header_label.configure(text="➖ Model Browser & Downloader")
+            self.is_expanded = True
+            # Change outer frame to take remaining space
+            if self.outer_frame:
+                self.outer_frame.pack_forget()
+                self.outer_frame.pack(fill="both", expand=True, padx=0, pady=(2, 5))
 
     def detect_system_info(self):
         """Detect system VRAM in background thread."""
