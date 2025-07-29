@@ -1,6 +1,6 @@
 import customtkinter as ctk
 import tkinter as tk
-from ui.grid import Grid
+from ui.core.grid import Grid
 
 def main():
 

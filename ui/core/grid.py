@@ -1,7 +1,7 @@
 import customtkinter as ctk
-from ui.terminal_window import TerminalWindow
-from ui.chat_window import ChatWindow
-from ui.options_window import OptionsWindow
+from ui.core.terminal_window import TerminalWindow
+from ui.core.chat_window import ChatWindow
+from ui.core.options_window import OptionsWindow
 
 class Grid:
     def __init__(self, app: ctk.CTk):
