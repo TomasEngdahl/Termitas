@@ -1,31 +1,35 @@
+#!/usr/bin/env python3
+"""
+PyTorch Model Downloader for Hugging Face models
+"""
+
 import os
-import requests
-import json
 import threading
 import time
+from pathlib import Path
 from typing import List, Dict, Optional, Callable
-from huggingface_hub import HfApi, list_repo_files, snapshot_download
-from database.models_db import get_db
+from huggingface_hub import HfApi, snapshot_download
+from database.models_db import get_db, get_models_dir
 
 class DownloadProgress:
-    """Class to track download progress."""
+    """Tracks download progress for a model."""
+    
     def __init__(self, model_id: str):
         self.model_id = model_id
-        self.status = "downloading"  # downloading, paused, completed, error
-        self.progress = 0.0  # 0.0 to 1.0
+        self.progress_percent = 0.0
         self.downloaded_bytes = 0
         self.total_bytes = 0
-        self.speed = 0.0  # bytes per second
-        self.eta = 0  # estimated time remaining in seconds
+        self.download_speed = 0.0
+        self.eta_seconds = None
+        self.status = "pending"  # pending, downloading, paused, completed, error
         self.error_message = None
 
 class PyTorchModelDownloader:
     """Downloads and manages PyTorch models from Hugging Face."""
     
     def __init__(self):
-        self.models_dir = "models"
+        self.models_dir = get_models_dir()
         self.api = HfApi()
-        os.makedirs(self.models_dir, exist_ok=True)
         self.db = get_db()
         self.active_downloads = {}  # model_id -> DownloadProgress
         self.download_threads = {}  # model_id -> Thread
@@ -134,7 +138,7 @@ class PyTorchModelDownloader:
             # Initialize progress
             progress = self.active_downloads[model_id]
             progress.status = "downloading"
-            progress.progress = 0.0
+            progress.progress_percent = 0.0
             
             # Estimate total size first
             try:
@@ -169,28 +173,28 @@ class PyTorchModelDownloader:
                 # Wait a bit for actual download to start
                 time.sleep(2)
                 
-                while progress.status == "downloading" and progress.progress < 0.98:
+                while progress.status == "downloading" and progress.progress_percent < 0.98:
                     time.sleep(1)
                     elapsed = time.time() - start_time
                     
                     # More realistic progress simulation
                     if elapsed < 30:  # First 30 seconds: slow start
-                        progress.progress = min(0.15, elapsed / 200.0)
+                        progress.progress_percent = min(0.15, elapsed / 200.0)
                     elif elapsed < 300:  # Next 4.5 minutes: steady progress
-                        progress.progress = min(0.85, 0.15 + (elapsed - 30) / 600.0)
+                        progress.progress_percent = min(0.85, 0.15 + (elapsed - 30) / 600.0)
                     else:  # Final phase: slower progress
-                        progress.progress = min(0.98, 0.85 + (elapsed - 300) / 1200.0)
+                        progress.progress_percent = min(0.98, 0.85 + (elapsed - 300) / 1200.0)
                     
                     # Calculate speed and ETA
                     if progress.total_bytes > 0:
-                        downloaded_bytes = progress.progress * progress.total_bytes
+                        downloaded_bytes = progress.progress_percent * progress.total_bytes
                         progress.downloaded_bytes = downloaded_bytes
                         
                         if elapsed > 10:  # Wait for stable speed calculation
-                            progress.speed = downloaded_bytes / elapsed
+                            progress.download_speed = downloaded_bytes / elapsed
                             remaining_bytes = progress.total_bytes - downloaded_bytes
-                            if progress.speed > 0:
-                                progress.eta = int(remaining_bytes / progress.speed)
+                            if progress.download_speed > 0:
+                                progress.eta_seconds = int(remaining_bytes / progress.download_speed)
                     
                     if progress_callback:
                         progress_callback(progress)
@@ -210,7 +214,7 @@ class PyTorchModelDownloader:
             
             # Mark as completed
             progress.status = "completed"
-            progress.progress = 1.0
+            progress.progress_percent = 1.0
             
             # Calculate actual downloaded size
             actual_size = 0
@@ -278,19 +282,51 @@ class PyTorchModelDownloader:
             return False
     
     def list_downloaded_models(self) -> List[str]:
-        """List downloaded PyTorch models."""
-        downloaded = []
+        """List all downloaded models."""
+        downloaded_models = []
         
         if os.path.exists(self.models_dir):
             for item in os.listdir(self.models_dir):
                 item_path = os.path.join(self.models_dir, item)
                 if os.path.isdir(item_path):
-                    # Check if it contains model files
-                    if any(f.endswith(('.bin', '.safetensors', '.pth')) for f in os.listdir(item_path)):
-                        downloaded.append(item)
+                    # Check if it's a valid model directory
+                    if self._is_valid_model_directory(item_path):
+                        downloaded_models.append(item)
         
-        return downloaded
+        return downloaded_models
     
+    def _is_valid_model_directory(self, directory_path: str) -> bool:
+        """Check if a directory contains a valid model."""
+        try:
+            if not os.path.isdir(directory_path):
+                return False
+            
+            # Check for common model files
+            model_files = [
+                'config.json',
+                'tokenizer.json',
+                'tokenizer_config.json'
+            ]
+            
+            # Check for at least one model weight file
+            weight_files = [
+                'pytorch_model.bin',
+                'model.safetensors',
+                'model-00001-of-00002.safetensors',
+                'pytorch_model-00001-of-00002.bin'
+            ]
+            
+            files = os.listdir(directory_path)
+            
+            # Must have config.json and at least one weight file
+            has_config = any(f in files for f in model_files)
+            has_weights = any(f in files for f in weight_files)
+            
+            return has_config and has_weights
+            
+        except Exception:
+            return False
+
     def get_model_path(self, model_name: str) -> Optional[str]:
         """Get the full path to a downloaded model."""
         model_path = os.path.join(self.models_dir, model_name)

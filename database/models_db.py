@@ -185,16 +185,30 @@ class ModelsDatabase:
             return False
     
     def update_model_usage(self, model_id: str):
-        """Update last_used timestamp for a model."""
+        """Update the last_used timestamp for a model."""
         try:
             with self.get_connection() as conn:
-                conn.execute(
-                    'UPDATE models SET last_used = ? WHERE model_id = ?',
-                    (datetime.now().isoformat(), model_id)
-                )
+                conn.execute('''
+                    UPDATE models 
+                    SET last_used = CURRENT_TIMESTAMP 
+                    WHERE model_id = ?
+                ''', (model_id,))
                 conn.commit()
         except Exception as e:
-            print(f"Error updating model usage: {e}")
+            print(f"❌ Error updating model usage: {e}")
+    
+    def update_model_path(self, model_id: str, new_path: str):
+        """Update the local_path for a model."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute('''
+                    UPDATE models 
+                    SET local_path = ? 
+                    WHERE model_id = ?
+                ''', (new_path, model_id))
+                conn.commit()
+        except Exception as e:
+            print(f"❌ Error updating model path: {e}")
     
     def is_model_downloaded(self, model_id: str) -> bool:
         """Check if a model is already downloaded."""
