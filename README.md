@@ -12,6 +12,7 @@ A modern AI-powered chat application that runs powerful language models locally 
 - **📦 Easy Packaging** - Create standalone executables for distribution
 - **💾 Chat History** - Save and manage conversation sessions
 - **🎨 Modern UI** - Clean, responsive interface built with CustomTkinter
+- **📁 AppData Storage** - Models stored in user's local AppData directory
 
 ## 🎯 What It Does
 
@@ -29,6 +30,7 @@ Termitas is your local AI chat companion that can:
 - **AI Engine**: PyTorch with transformers for local model inference
 - **Model Management**: Hugging Face Hub integration
 - **Storage**: SQLite for model metadata and chat history
+- **Data Storage**: AppData directory for user data and models
 - **Optimization**: CPU-optimized loading with memory efficiency
 
 ## 🚀 Getting Started
@@ -120,6 +122,19 @@ uv pip install torch torchvision torchaudio --index-url https://download.pytorch
 - **✅ Simple workflow** - Easy to remember and use
 
 ## 📦 Model Management
+
+### Data Storage
+
+Models are automatically stored in your system's AppData directory:
+- **Windows**: `%LOCALAPPDATA%\Termitas\downloaded_models\`
+- **macOS**: `~/Library/Application Support/Termitas/downloaded_models/`
+- **Linux**: `~/.local/share/Termitas/downloaded_models/`
+
+This ensures:
+- **✅ Clean project directory** - No large model files in source code
+- **✅ Multi-user support** - Each user gets their own model directory
+- **✅ Easy uninstall** - Models can be removed with app uninstall
+- **✅ Standard practice** - Follows desktop app conventions
 
 ### Finding Models
 
@@ -217,7 +232,7 @@ python install_cuda_pytorch.py
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache License, Version 2.0 - see the LICENSE file for details.
 
 ## 🤝 Contributing
 
