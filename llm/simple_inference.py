@@ -8,6 +8,7 @@ import torch.nn as nn
 from typing import List, Dict
 import os
 from threading import Lock
+import platform
 
 class SimpleInference:
     """Simple inference engine for local LLM chat."""
@@ -17,13 +18,8 @@ class SimpleInference:
         self.tokenizer = None
         self.current_model_path = None
         
-        # Auto-detect best device
-        if torch.cuda.is_available():
-            self.device = "cuda"
-            print(f"🚀 GPU detected: {torch.cuda.get_device_name(0)}")
-        else:
-            self.device = "cpu"
-            print("🚀 Using CPU (no GPU detected)")
+        # Auto-detect best device with RTX 5090 handling
+        self.device = self._detect_best_device()
         
         self.lock = Lock()
         
@@ -51,8 +47,48 @@ Be conversational and helpful in your responses.
         
         print(f"🚀 SimpleInference initialized on device: {self.device}")
     
+    def _detect_best_device(self) -> str:
+        """Detect the best available device with universal GPU support."""
+        if not torch.cuda.is_available():
+            print("🚀 Using CPU (no GPU detected)")
+            return "cpu"
+        
+        try:
+            device_name = torch.cuda.get_device_name(0)
+            device_capability = torch.cuda.get_device_capability(0)
+            print(f"🚀 GPU detected: {device_name}")
+            print(f"🚀 CUDA capability: sm_{device_capability[0]}{device_capability[1]}")
+            
+            # Check PyTorch version
+            torch_version = torch.__version__
+            print(f"🚀 PyTorch version: {torch_version}")
+            
+            # Check if this is a CPU-only PyTorch installation
+            if "+cpu" in torch_version:
+                print(f"⚠️  CPU-only PyTorch detected ({torch_version})")
+                print(f"💡 Install CUDA version for GPU acceleration: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128")
+                return "cpu"
+            
+            # Test GPU operations to ensure compatibility
+            try:
+                x = torch.randn(100, 100).cuda()
+                y = torch.randn(100, 100).cuda()
+                z = torch.mm(x, y)
+                del x, y, z
+                print(f"✅ GPU operations test passed - using GPU")
+                return "cuda"
+            except Exception as e:
+                print(f"❌ GPU operations test failed: {e}")
+                print(f"💡 Falling back to CPU for stability")
+                return "cpu"
+                
+        except Exception as e:
+            print(f"⚠️  GPU detection failed: {e}")
+            print(f"🔄 Falling back to CPU")
+            return "cpu"
+    
     def set_model(self, model_path: str) -> bool:
-        """Load the real model with fallback to mock if needed."""
+        """Load the real model with improved fallback handling."""
         try:
             with self.lock:
                 print(f"🔄 Loading model: {model_path}")
@@ -74,47 +110,11 @@ Be conversational and helpful in your responses.
                     
                     print(f"🔄 Loading real model...")
                     
-                    # Try loading with GPU first, then fallback to CPU
-                    try:
-                        print(f"🔄 Loading model with {self.device.upper()}...")
-                        self.model = AutoModelForCausalLM.from_pretrained(
-                            model_path,
-                            torch_dtype=torch.float16,
-                            trust_remote_code=True,
-                            low_cpu_mem_usage=True,
-                            device_map="auto" if self.device == "cuda" else "cpu"
-                        )
-                        print(f"✅ Real model loaded successfully on {self.device.upper()}")
-                        self.current_model_path = model_path
-                        return True
-                    except Exception as e:
-                        print(f"⚠️ {self.device.upper()} loading failed: {e}")
-                        
-                        # Check if it's an RTX 5090 compatibility issue
-                        if "RTX 5090" in str(e) or "sm_120" in str(e):
-                            print(f"💡 RTX 5090 detected - PyTorch 2.7.0 doesn't support sm_120")
-                            print(f"💡 This is expected behavior, falling back to CPU")
-                        
-                        # Fallback to CPU if GPU failed
-                        if self.device == "cuda":
-                            print(f"🔄 Falling back to CPU...")
-                            try:
-                                self.device = "cpu"
-                                self.model = AutoModelForCausalLM.from_pretrained(
-                                    model_path,
-                                    torch_dtype=torch.float16,
-                                    trust_remote_code=True,
-                                    low_cpu_mem_usage=True,
-                                    device_map="cpu"
-                                )
-                                print(f"✅ Real model loaded successfully on CPU (fallback)")
-                                self.current_model_path = model_path
-                                return True
-                            except Exception as cpu_e:
-                                print(f"⚠️ CPU fallback also failed: {cpu_e}")
-                                return False
-                        else:
-                            return False
+                    # Load model based on detected device
+                    if self.device == "cuda":
+                        return self._load_model_gpu(model_path)
+                    else:
+                        return self._load_model_cpu(model_path)
                     
                 except Exception as e:
                     print(f"⚠️ Real model loading failed: {e}")
@@ -122,6 +122,84 @@ Be conversational and helpful in your responses.
                 
         except Exception as e:
             print(f"❌ Error loading model: {e}")
+            return False
+    
+    def _load_model_gpu(self, model_path: str) -> bool:
+        """Load model on GPU with fallback to CPU."""
+        try:
+            print(f"🔄 Loading model with CUDA...")
+            
+            # Import transformers here to ensure availability
+            from transformers import AutoModelForCausalLM
+            
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                trust_remote_code=True,
+                low_cpu_mem_usage=True,
+                device_map="auto"
+            )
+            print(f"✅ Real model loaded successfully on CUDA")
+            self.current_model_path = model_path
+            return True
+        except Exception as e:
+            print(f"⚠️ CUDA loading failed: {e}")
+            
+            # Check if it's an RTX 5090 compatibility issue
+            if "RTX 5090" in str(e) or "sm_120" in str(e) or "no kernel image" in str(e):
+                print(f"💡 RTX 5090 compatibility issue detected")
+                print(f"💡 This is expected behavior, falling back to CPU")
+            
+            # Fallback to CPU
+            print(f"🔄 Falling back to CPU...")
+            return self._load_model_cpu(model_path)
+    
+    def _load_model_cpu(self, model_path: str) -> bool:
+        """Load model on CPU with minimal settings."""
+        try:
+            print(f"🔄 Loading model with minimal settings...")
+            self.device = "cpu"  # Ensure device is set to CPU
+            
+            # Import transformers here to ensure availability
+            from transformers import AutoModelForCausalLM
+            
+            # Use minimal settings for CPU loading with better error handling
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.float32,  # Use float32 for CPU stability
+                    trust_remote_code=True,
+                    low_cpu_mem_usage=True,
+                    device_map="cpu",
+                    offload_folder="offload"  # Add offload folder for memory management
+                )
+                print(f"✅ Real model loaded successfully on CPU")
+                self.current_model_path = model_path
+                return True
+            except Exception as e:
+                print(f"⚠️  First CPU loading attempt failed: {e}")
+                
+                # Try with even more minimal settings
+                try:
+                    print(f"🔄 Trying with more minimal settings...")
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_path,
+                        torch_dtype=torch.float32,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
+                        device_map="cpu",
+                        offload_folder="offload",
+                        max_memory={"cpu": "8GB"}  # Limit memory usage
+                    )
+                    print(f"✅ Real model loaded successfully on CPU (minimal settings)")
+                    self.current_model_path = model_path
+                    return True
+                except Exception as e2:
+                    print(f"❌ CPU loading failed with minimal settings: {e2}")
+                    return False
+                    
+        except Exception as e:
+            print(f"❌ CPU loading failed: {e}")
             return False
     
     def generate_response(self, messages: List[Dict], max_length: int = 512) -> str:

@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from llm.simple_inference import simple_inference
+from ui.core.window_utils import center_window
 
 class DownloadedBody:
     def __init__(self, app: ctk.CTk, frame: ctk.CTkFrame):
@@ -369,19 +370,6 @@ class DownloadedBody:
         )
         delete_button.pack(side="left", padx=2)
 
-        # Use model button (placeholder for future functionality)
-        use_button = ctk.CTkButton(
-            buttons_frame,
-            text="🚀 Use Model",
-            width=90,
-            height=22,
-            font=(config.body_font, 10),
-            command=lambda: self.use_model(model['model_id']),
-            fg_color="#228b22",
-            hover_color="#1e6b1e"
-        )
-        use_button.pack(side="right")
-
     def open_model_folder(self, local_path):
         """Open the model folder in file explorer."""
         try:
@@ -400,13 +388,22 @@ class DownloadedBody:
             self.show_message("Error", f"Failed to open folder: {str(e)}")
 
     def delete_model(self, model_id):
-        """Delete a downloaded model."""
+        """Delete a model from the database and filesystem."""
+        # Get the model from database
+        model = self.db.get_model(model_id)
+        if not model:
+            self.show_message("Error", f"Model '{model_id}' not found in database.")
+            return
+        
         # Show confirmation dialog
         confirm_window = ctk.CTkToplevel(self.app)
         confirm_window.title("Confirm Delete")
-        confirm_window.geometry("400x150")
+        confirm_window.geometry("400x200")
         confirm_window.transient(self.app)
         confirm_window.grab_set()
+        
+        # Center the window
+        center_window(confirm_window, 400, 200)
 
         label = ctk.CTkLabel(
             confirm_window,
@@ -462,52 +459,6 @@ class DownloadedBody:
             print(f"Cancelled download of {model_id}")
             self.refresh_downloaded_models()  # Refresh to update UI
 
-    def use_model(self, model_id):
-        """Activate a model for use."""
-        try:
-            # Get the model from database
-            model = self.db.get_model(model_id)
-            if not model:
-                self.show_message("Error", f"Model '{model_id}' not found in database.")
-                return
-            
-            print(f"Activating model: {model['display_name']}")
-            print(f"Model path: {model.get('local_path', 'No path')}")
-            
-            # Set model for simple inference
-            model_path = model.get('local_path')
-            if model_path:
-                print(f"Setting model for simple inference: {model_path}")
-                
-                # Check if model directory exists
-                if not os.path.exists(model_path):
-                    self.show_message("Error", f"Model directory not found: {model_path}")
-                    return
-                
-                # Use simple inference instead of terminal inference
-                success = simple_inference.set_model(model_path)
-                
-                if success:
-                    print(f"✅ Model activated successfully: {model['display_name']}")
-                    self.show_message("Success", f"Model '{model['display_name']}' activated successfully!")
-                    
-                    # Update the active model in the main application
-                    if hasattr(self, 'parent') and hasattr(self.parent, 'active_model'):
-                        self.parent.active_model = model
-                        print(f"✅ Active model updated: {model['display_name']}")
-                else:
-                    print(f"❌ Failed to activate model: {model['display_name']}")
-                    self.show_message("Error", f"Failed to activate model '{model['display_name']}'. Please try again.")
-            else:
-                print(f"❌ No local path found for model: {model_id}")
-                self.show_message("Error", f"No local path found for model '{model['display_name']}'.")
-                
-        except Exception as e:
-            print(f"❌ Error activating model: {e}")
-            import traceback
-            traceback.print_exc()
-            self.show_message("Error", f"Error activating model: {str(e)}")
-
     def show_message(self, title, message):
         """Show a message dialog."""
         message_window = ctk.CTkToplevel(self.app)
@@ -515,6 +466,9 @@ class DownloadedBody:
         message_window.geometry("400x150")
         message_window.transient(self.app)
         message_window.grab_set()
+        
+        # Center the window
+        center_window(message_window, 400, 150)
 
         label = ctk.CTkLabel(
             message_window,

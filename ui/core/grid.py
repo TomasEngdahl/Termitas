@@ -37,3 +37,6 @@ class Grid:
         self.app.chat_window.terminal_window = self.app.terminal_window
         self.app.terminal_window.chat_window = self.app.chat_window
         self.app.chat_window.active_model_section = self.app.options_window.active_body
+        
+        # Store reference to options window in main app for GPU status updates
+        self.app.options_window_ref = self.app.options_window

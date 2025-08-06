@@ -35,27 +35,89 @@ Termitas is your local AI chat companion that can:
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - 8GB+ RAM (16GB+ recommended)
 - NVIDIA GPU with 8GB+ VRAM (optional but recommended)
 
 ### Installation
 
-1. **Clone the repository:**
+**Option 1: Using uv (if you have uv installed)**
+```bash
+# 1. Install dependencies
+uv sync
+
+# 2. Install CUDA PyTorch for GPU acceleration
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 --force-reinstall
+
+# 3. Run the application
+python main.py
+```
+
+**Option 2: Using pip/venv (Recommended)**
+```bash
+# 1. Create virtual environment
+python -m venv .venv
+
+# 2. Activate virtual environment
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+
+# 3. Install dependencies
+pip install -e .
+
+# 4. Install CUDA PyTorch for GPU acceleration
+python install_cuda_pytorch.py
+
+# 5. Run the application
+python main.py
+```
+
+## 🔧 GPU Acceleration Setup
+
+**For RTX 5090 and other modern NVIDIA GPUs:**
+
+### **✅ Working Workflow:**
+
+1. **Install base dependencies:**
    ```bash
-   git clone https://github.com/yourusername/termitas.git
-   cd termitas
+   pip install -e .
    ```
 
-2. **Install dependencies:**
+2. **Install CUDA PyTorch:**
    ```bash
-   uv sync
+   python install_cuda_pytorch.py
    ```
 
 3. **Run the application:**
    ```bash
-   uv run main.py
+   python main.py
    ```
+
+### **⚠️ Troubleshooting:**
+
+**If GPU is not detected:**
+```bash
+# Reinstall CUDA PyTorch
+python install_cuda_pytorch.py
+
+# Verify installation
+python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+```
+
+**If you're using uv and it reinstalls CPU version:**
+```bash
+# After uv run, reinstall CUDA version
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 --force-reinstall
+```
+
+### **🎯 Why This Works:**
+
+- **✅ Direct pip installation** - No dependency resolution conflicts
+- **✅ CUDA index** - Gets PyTorch 2.8.0+cu128 for RTX 5090
+- **✅ Helper script** - Automatically verifies GPU detection
+- **✅ Simple workflow** - Easy to remember and use
 
 ## 📦 Model Management
 
@@ -98,121 +160,73 @@ You: "What is machine learning?"
 AI: Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed. It involves algorithms that can identify patterns in data and make predictions or decisions based on that data.
 
 The main types of machine learning include:
-- Supervised learning (using labeled data)
-- Unsupervised learning (finding patterns in unlabeled data)
-- Reinforcement learning (learning through trial and error)
-```
-
-```
-You: "Help me write a Python function"
-
-AI: I'd be happy to help you write a Python function! Here's a simple example:
-
-```python
-def greet_user(name):
-    """A simple function that greets a user."""
-    return f"Hello, {name}! Welcome to our program."
-```
-
-What specific function would you like to create?
 ```
 
 ## 🔧 Configuration
 
-### GPU Support
+### GPU Settings
 
-The application includes built-in GPU support with automatic detection:
+Access GPU settings through the application menu to:
+- **Check GPU status** and PyTorch version
+- **Install CUDA PyTorch** for GPU acceleration
+- **Verify GPU detection** and compatibility
 
-#### **Automatic GPU Detection**
-- **NVIDIA CUDA** - For NVIDIA GPUs (RTX, GTX, etc.)
-- **Apple MPS** - For Apple Silicon Macs
-- **CPU Fallback** - Automatic fallback when GPU is unavailable
+### Model Settings
 
-#### **GPU Settings Dialog**
-Access via the "⚙️ GPU Settings" button in the options panel:
-- **GPU Status Check** - View your GPU and PyTorch configuration
-- **One-Click Installation** - Install PyTorch with CUDA support
-- **Nightly Builds** - For latest GPUs like RTX 5090
-- **CPU-Only Option** - For systems without GPU
+- **Model selection** - Choose from downloaded models
+- **Memory management** - Optimize for your hardware
+- **Performance tuning** - Adjust for speed vs. quality
 
-#### **Supported GPUs**
-- **RTX 40 Series** - Full support with CUDA
-- **RTX 30 Series** - Full support with CUDA
-- **RTX 5090** - Requires nightly PyTorch build
-- **GTX Series** - Limited support (older models)
-- **Apple Silicon** - MPS acceleration
+## 🚀 Performance Tips
 
-### Memory Optimization
+### For GPU Users:
+- **Use CUDA PyTorch** - Install with `python install_cuda_pytorch.py`
+- **Monitor VRAM** - Keep an eye on GPU memory usage
+- **Choose appropriate models** - Balance size vs. performance
 
-- **Smart Device Mapping** - Automatic GPU/CPU allocation
-- **Low Memory Usage** - Optimized for desktop systems
-- **Fallback System** - Graceful degradation to CPU
+### For CPU Users:
+- **Use smaller models** - 3B-7B parameter models work well
+- **Close other applications** - Free up RAM for model loading
+- **Be patient** - CPU inference is slower but still functional
 
-## 📦 Building Executables
+## 🐛 Troubleshooting
 
-### Using PyInstaller
+### Common Issues
 
+**GPU not detected:**
 ```bash
-python build_exe.py
+python install_cuda_pytorch.py
 ```
 
-This creates a standalone executable with:
-- All dependencies included
-- GPU support preserved
-- Optimized for distribution
+**Model loading fails:**
+- Check available RAM/VRAM
+- Try a smaller model
+- Restart the application
 
-### Package Features
+**Slow performance:**
+- Use GPU acceleration if available
+- Close other applications
+- Choose smaller models
 
-- **Small Size** - Optimized PyTorch packaging
-- **GPU Support** - CUDA/MPS included
-- **No Installation** - Runs on any compatible system
-- **Offline Capable** - Works without internet after setup
+### Getting Help
 
-## 🛠️ Development
-
-### Project Structure
-
-```
-termitas/
-├── main.py                 # Application entry point
-├── config.py              # Configuration settings
-├── ui/                    # User interface components
-│   ├── core/             # Main UI windows
-│   └── models/           # Model management UI
-├── llm/                  # AI inference engine
-│   ├── simple_inference.py  # PyTorch inference
-│   └── model_downloader.py  # Model management
-├── hf/                   # Hugging Face integration
-└── database/             # SQLite database layer
-```
-
-### Key Components
-
-- **SimpleInference** - PyTorch-based AI engine
-- **PyTorchModelDownloader** - Model download and management
-- **ChatWindow** - Main chat interface
-- **ListModels** - Model browser and downloader
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+1. **Check the logs** - Look for error messages in the console
+2. **Verify GPU drivers** - Ensure NVIDIA drivers are up to date
+3. **Test PyTorch installation** - Run the verification script
+4. **Check system requirements** - Ensure sufficient RAM/VRAM
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## 🤝 Contributing
 
-- **Hugging Face** - For the model ecosystem
-- **PyTorch Team** - For the excellent ML framework
-- **CustomTkinter** - For the beautiful UI framework
+Contributions are welcome! Please feel free to submit a Pull Request.
 
----
+## 📞 Support
 
-**Ready to supercharge your terminal workflow?** 🚀
-
-Start Termitas and let AI handle your command-line tasks!
+If you encounter any issues:
+1. Check the troubleshooting section above
+2. Verify your system meets the requirements
+3. Try the GPU setup workflow
+4. Open an issue with detailed error information

@@ -8,6 +8,11 @@ from hf.auth import is_authenticated, get_user_info, authenticate, logout
 from database.models_db import get_db
 from typing import Optional, Dict
 from llm.model_downloader import pytorch_model_downloader, DownloadProgress
+import subprocess
+import os
+from pathlib import Path
+from datetime import datetime
+from ui.core.window_utils import center_window
 
 class ListModels:
     def __init__(self, app: ctk.CTk, frame: ctk.CTkFrame):
@@ -925,8 +930,7 @@ class ListModels:
         message_window.grab_set()
         
         # Center the window
-        message_window.lift()
-        message_window.focus()
+        center_window(message_window, 400, 150)
         
         label = ctk.CTkLabel(
             message_window,
@@ -983,25 +987,15 @@ class ListModels:
             )
     
     def show_auth_dialog(self):
-        """Show authentication dialog or logout if already authenticated."""
-        if is_authenticated():
-            # Show logout confirmation
-            self.show_logout_dialog()
-        else:
-            # Show login dialog
-            self.show_login_dialog()
-    
-    def show_login_dialog(self):
-        """Show HuggingFace login dialog."""
+        """Show authentication dialog for Hugging Face."""
         auth_window = ctk.CTkToplevel(self.app)
         auth_window.title("Hugging Face Authentication")
-        auth_window.geometry("500x300")
+        auth_window.geometry("400x300")
         auth_window.transient(self.app)
         auth_window.grab_set()
         
         # Center the window
-        auth_window.lift()
-        auth_window.focus()
+        center_window(auth_window, 400, 300)
         
         # Main content frame
         content_frame = ctk.CTkFrame(auth_window, fg_color="transparent")
@@ -1107,10 +1101,13 @@ you need a Hugging Face account and access token.
     def show_logout_dialog(self):
         """Show logout confirmation dialog."""
         logout_window = ctk.CTkToplevel(self.app)
-        logout_window.title("Logout")
-        logout_window.geometry("350x150")
+        logout_window.title("Logout Confirmation")
+        logout_window.geometry("400x200")
         logout_window.transient(self.app)
         logout_window.grab_set()
+        
+        # Center the window
+        center_window(logout_window, 400, 200)
         
         user_info = get_user_info()
         username = user_info.get('name', 'User') if user_info else 'User'

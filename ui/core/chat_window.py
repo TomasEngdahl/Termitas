@@ -8,6 +8,8 @@ from typing import Optional, List, Dict
 import threading
 import time
 from datetime import datetime
+from ui.common.label_with_border import LabelWithBorder
+from ui.core.window_utils import center_window
 
 class ChatWindow:
     def __init__(self, app: ctk.CTk, frame: ctk.CTkFrame):
@@ -395,3 +397,14 @@ Select a model above and start chatting! Ask me things like:
             command=dialog.destroy
         )
         ok_button.pack(pady=10)
+
+    def show_error_dialog(self, title, message):
+        """Show an error dialog."""
+        dialog = ctk.CTkToplevel(self.app)
+        dialog.title(title)
+        dialog.geometry("400x200")
+        dialog.transient(self.app)
+        dialog.grab_set()
+        
+        # Center the window
+        center_window(dialog, 400, 200)

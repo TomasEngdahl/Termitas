@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 from typing import Optional
+from ui.core.window_utils import center_window
 
 class GPUSettingsDialog:
     """Dialog for configuring GPU settings and PyTorch installation."""
@@ -20,6 +21,8 @@ class GPUSettingsDialog:
         self.dialog.resizable(False, False)
         
         # Center the dialog
+        center_window(self.dialog, 600, 500)
+        
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
@@ -57,10 +60,10 @@ class GPUSettingsDialog:
         button_frame = ctk.CTkFrame(install_frame)
         button_frame.pack(fill="x", padx=10, pady=(0, 10))
         
-        # CUDA button
+        # CUDA button (universal for all modern GPUs)
         self.cuda_button = ctk.CTkButton(
             button_frame, 
-            text="Install PyTorch with CUDA", 
+            text="Install PyTorch with CUDA 12.8", 
             command=self.install_cuda_pytorch,
             fg_color="green"
         )
@@ -75,37 +78,44 @@ class GPUSettingsDialog:
         )
         self.cpu_button.pack(side="left", padx=(0, 10), pady=5)
         
-        # Nightly button
-        self.nightly_button = ctk.CTkButton(
-            button_frame, 
-            text="Install Nightly Build", 
-            command=self.install_nightly_pytorch,
-            fg_color="orange"
-        )
-        self.nightly_button.pack(side="left", pady=5)
-        
         # Progress bar
         self.progress_bar = ctk.CTkProgressBar(main_frame)
         self.progress_bar.pack(fill="x", padx=10, pady=10)
         self.progress_bar.set(0)
         
         # Status label
-        self.install_status = ctk.CTkLabel(main_frame, text="Ready to install", font=("Arial", 12))
+        self.install_status = ctk.CTkLabel(main_frame, text="", font=("Arial", 12))
         self.install_status.pack(pady=5)
+        
+        # Refresh button
+        refresh_button = ctk.CTkButton(
+            main_frame,
+            text="🔄 Refresh GPU Status",
+            command=self.refresh_gpu_status,
+            fg_color="blue",
+            height=30
+        )
+        refresh_button.pack(pady=5)
         
         # Close button
         close_button = ctk.CTkButton(main_frame, text="Close", command=self.dialog.destroy)
         close_button.pack(pady=10)
     
     def check_gpu_status(self):
-        """Check GPU status and display results."""
+        """Check and display GPU status."""
         try:
             import torch
             
             status_info = f"PyTorch Version: {torch.__version__}\n"
             status_info += f"CUDA Available: {torch.cuda.is_available()}\n"
             
-            if torch.cuda.is_available():
+            # Check if this is CPU-only PyTorch
+            if "+cpu" in torch.__version__:
+                status_info += f"⚠️  CPU-only PyTorch detected!\n"
+                status_info += f"💡 To enable GPU acceleration, install CUDA version:\n"
+                status_info += f"   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128\n"
+                status_info += f"💡 The app will work on CPU until then\n"
+            elif torch.cuda.is_available():
                 status_info += f"CUDA Version: {torch.version.cuda}\n"
                 status_info += f"Device Count: {torch.cuda.device_count()}\n"
                 
@@ -113,14 +123,16 @@ class GPUSettingsDialog:
                     device_name = torch.cuda.get_device_name(i)
                     device_capability = torch.cuda.get_device_capability(i)
                     status_info += f"Device {i}: {device_name}\n"
-                    status_info += f"  CUDA Capability: {device_capability}\n"
+                    status_info += f"  CUDA Capability: sm_{device_capability[0]}{device_capability[1]}\n"
                     
-                    # Check RTX 5090 compatibility
-                    if "RTX 5090" in device_name:
-                        status_info += f"  ⚠️  RTX 5090 detected!\n"
-                        status_info += f"  ⚠️  PyTorch {torch.__version__} only supports up to sm_90\n"
-                        status_info += f"  ⚠️  Your GPU has sm_{device_capability[0]}{device_capability[1]}\n"
-                        status_info += f"  💡 Use CPU fallback or wait for PyTorch 2.8+\n"
+                    # Check if PyTorch version supports this GPU
+                    torch_version = torch.__version__
+                    if "2.8" in torch_version and "cu128" in torch_version:
+                        status_info += f"  ✅ PyTorch 2.8+cu128 supports all modern GPUs\n"
+                    elif "2.7" in torch_version and "cu128" in torch_version:
+                        status_info += f"  ✅ PyTorch 2.7+cu128 supports most modern GPUs\n"
+                    else:
+                        status_info += f"  ⚠️  Consider upgrading to PyTorch 2.7+cu128 or 2.8+cu128\n"
                 
                 # Test basic GPU operations
                 try:
@@ -128,13 +140,13 @@ class GPUSettingsDialog:
                     y = torch.randn(100, 100).cuda()
                     z = torch.mm(x, y)
                     status_info += "\n✅ Basic GPU operations working\n"
+                    status_info += "✅ GPU acceleration available\n"
                 except Exception as e:
                     status_info += f"\n❌ GPU operations failed: {e}\n"
-                    if "RTX 5090" in str(e):
-                        status_info += f"  💡 This is expected for RTX 5090 with PyTorch 2.7.0\n"
-                        status_info += f"  💡 The app will automatically fall back to CPU\n"
+                    status_info += "💡 The app will automatically fall back to CPU\n"
             else:
                 status_info += "\n❌ No CUDA devices found\n"
+                status_info += "💡 CPU-only mode will be used\n"
             
             self.status_text.delete("1.0", "end")
             self.status_text.insert("1.0", status_info)
@@ -145,15 +157,11 @@ class GPUSettingsDialog:
     
     def install_cuda_pytorch(self):
         """Install PyTorch with CUDA support."""
-        self.install_pytorch("--index-url https://download.pytorch.org/whl/cu121")
+        self.install_pytorch("--index-url https://download.pytorch.org/whl/cu128")
     
     def install_cpu_pytorch(self):
         """Install CPU-only PyTorch."""
         self.install_pytorch("--index-url https://download.pytorch.org/whl/cpu")
-    
-    def install_nightly_pytorch(self):
-        """Install PyTorch nightly build."""
-        self.install_pytorch("--pre --index-url https://download.pytorch.org/whl/nightly/cu121")
     
     def install_pytorch(self, index_url: str):
         """Install PyTorch with the specified index URL."""
@@ -193,7 +201,19 @@ class GPUSettingsDialog:
         thread.daemon = True
         thread.start()
     
+    def refresh_gpu_status(self):
+        """Refresh GPU status in the options window."""
+        if hasattr(self.parent, 'options_window_ref') and self.parent.options_window_ref:
+            self.parent.options_window_ref.update_gpu_status()
+            self.check_gpu_status()  # Also refresh the dialog's status
+            self.install_status.configure(text="✅ GPU status refreshed!")
+    
     def show(self):
         """Show the dialog."""
         self.dialog.wait_window()
+        
+        # Refresh GPU status in options window if it exists
+        if hasattr(self.parent, 'options_window_ref') and self.parent.options_window_ref:
+            self.parent.options_window_ref.update_gpu_status()
+        
         return self.dialog 

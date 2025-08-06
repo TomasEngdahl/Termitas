@@ -44,17 +44,73 @@ class OptionsWindow:
         self.list_models.downloaded_body = self.downloaded_body
         self.list_models.create_list_models()
         
+        # GPU Status and Settings Section
+        gpu_frame = ctk.CTkFrame(self.frame, height=60)
+        gpu_frame.pack(side="bottom", fill="x", pady=5)
+        
+        # GPU Status Indicator
+        self.gpu_status_label = ctk.CTkLabel(
+            gpu_frame,
+            text="🔄 Checking GPU status...",
+            font=(config.body_font, 12),
+            text_color=config.yellow
+        )
+        self.gpu_status_label.pack(side="left", padx=10, pady=5)
+        
         # GPU Settings Button
         self.gpu_button = ctk.CTkButton(
-            self.frame,
+            gpu_frame,
             text="⚙️ GPU Settings",
             command=self.open_gpu_settings,
             fg_color="purple",
             height=30
         )
-        self.gpu_button.pack(side="bottom", pady=5)
+        self.gpu_button.pack(side="right", padx=10, pady=5)
+        
+        # Update GPU status
+        self.update_gpu_status()
+    
+    def update_gpu_status(self):
+        """Update the GPU status indicator."""
+        try:
+            import torch
+            
+            if torch.cuda.is_available():
+                device_name = torch.cuda.get_device_name(0)
+                cuda_version = torch.version.cuda
+                torch_version = torch.__version__
+                
+                # Check if this is CUDA version (not CPU-only)
+                if "+cu" in torch_version:
+                    self.gpu_status_label.configure(
+                        text=f"✅ GPU: {device_name} (CUDA {cuda_version})",
+                        text_color=config.green
+                    )
+                else:
+                    self.gpu_status_label.configure(
+                        text=f"⚠️  GPU: {device_name} (CPU-only PyTorch)",
+                        text_color=config.yellow
+                    )
+            else:
+                self.gpu_status_label.configure(
+                    text="❌ No GPU detected",
+                    text_color=config.red
+                )
+                
+        except ImportError:
+            self.gpu_status_label.configure(
+                text="❌ PyTorch not installed",
+                text_color=config.red
+            )
+        except Exception as e:
+            self.gpu_status_label.configure(
+                text=f"❌ GPU error: {str(e)[:30]}...",
+                text_color=config.red
+            )
     
     def open_gpu_settings(self):
         """Open GPU settings dialog."""
         gpu_dialog = GPUSettingsDialog(self.app)
         gpu_dialog.show()
+        # Refresh GPU status after settings dialog closes
+        self.update_gpu_status()

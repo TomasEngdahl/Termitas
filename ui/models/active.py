@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from config import config
 from ui.common.label_with_border import LabelWithBorder
+from ui.core.window_utils import center_window
 
 class ActiveBody:
     def __init__(self, app: ctk.CTk, frame: ctk.CTkFrame):
@@ -100,14 +101,15 @@ class ActiveBody:
         for model in downloaded_models:
             print(f"Model: {model['display_name']} - Path: {model.get('local_path', 'No path')}")
         
-        if not downloaded_models:
-            self.show_message("No Models", "Please download models first from the Model Browser.")
-            return
-        
-        # Create selection dialog
+        # Create selector window
         selector_window = ctk.CTkToplevel(self.app)
-        selector_window.title("Select AI Model")
+        selector_window.title("Select Model")
         selector_window.geometry("500x400")
+        selector_window.resizable(False, False)
+        
+        # Center the window
+        center_window(selector_window, 500, 400)
+        
         selector_window.transient(self.app)
         selector_window.grab_set()
         
@@ -180,38 +182,110 @@ class ActiveBody:
         print(f"Selecting model: {model['display_name']}")
         print(f"Model path: {model.get('local_path', 'No path')}")
         
-        self.active_model = model
-        
-        # Set model for simple inference
-        model_path = model.get('local_path')
-        if model_path:
-            print(f"Setting model for simple inference: {model_path}")
-            from llm.simple_inference import simple_inference
-            success = simple_inference.set_model(model_path)
-            if not success:
-                print(f"❌ Failed to load model: {model['display_name']}")
-                self.show_message("Model Loading Error", 
-                               f"Failed to load model '{model['display_name']}'. This might be due to:\n"
-                               f"• Missing model files\n"
-                               f"• Insufficient memory\n"
-                               f"• Incompatible model architecture\n"
-                               f"• Missing dependencies\n\n"
-                               f"Check the console for detailed error messages.")
-                return
-        
-        # Update the active model display
-        self.set_active_model(model)
-        
-        # Notify chat window to refresh model status
-        if hasattr(self.app, 'chat_window') and self.app.chat_window:
-            self.app.chat_window.refresh_model_status()
-        
-        # Close the dialog
+        # Close the model selector dialog first
         if dialog_window:
             dialog_window.destroy()
         
-        print(f"✅ Model selected: {model['display_name']}")
-        self.show_message("Model Selected", f"Model '{model['display_name']}' is now active!")
+        # Show loading dialog
+        loading_window = self.show_loading_dialog(model['display_name'])
+        
+        # Set model for simple inference in a separate thread to avoid blocking UI
+        import threading
+        def load_model():
+            try:
+                model_path = model.get('local_path')
+                if model_path:
+                    print(f"Setting model for simple inference: {model_path}")
+                    from llm.simple_inference import simple_inference
+                    success = simple_inference.set_model(model_path)
+                    
+                    # Update UI on main thread
+                    self.app.after(0, lambda: self.finish_model_selection(model, success, loading_window))
+                else:
+                    self.app.after(0, lambda: self.finish_model_selection(model, False, loading_window))
+            except Exception as e:
+                print(f"❌ Error loading model: {e}")
+                self.app.after(0, lambda: self.finish_model_selection(model, False, loading_window))
+        
+        # Start loading in background thread
+        loading_thread = threading.Thread(target=load_model, daemon=True)
+        loading_thread.start()
+    
+    def show_loading_dialog(self, model_name):
+        """Show a loading dialog with progress bar."""
+        loading_window = ctk.CTkToplevel(self.app)
+        loading_window.title("Loading Model")
+        loading_window.geometry("400x200")
+        loading_window.transient(self.app)
+        loading_window.grab_set()
+        loading_window.resizable(False, False)
+        
+        # Center the window
+        center_window(loading_window, 400, 200)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            loading_window,
+            text="🔄 Loading Model",
+            font=(config.header_font, 16),
+            text_color=config.blue
+        )
+        title_label.pack(pady=(20, 10))
+        
+        # Model name
+        model_label = ctk.CTkLabel(
+            loading_window,
+            text=f"Model: {model_name}",
+            font=(config.body_font, 12),
+            text_color=config.header_font_color
+        )
+        model_label.pack(pady=(0, 20))
+        
+        # Progress bar
+        progress_bar = ctk.CTkProgressBar(loading_window)
+        progress_bar.pack(pady=(0, 20), padx=20, fill="x")
+        progress_bar.set(0)
+        progress_bar.start()
+        
+        # Status text
+        status_label = ctk.CTkLabel(
+            loading_window,
+            text="Loading model files...",
+            font=(config.body_font, 11),
+            text_color=config.yellow
+        )
+        status_label.pack(pady=(0, 10))
+        
+        # Store references for updating
+        loading_window.progress_bar = progress_bar
+        loading_window.status_label = status_label
+        
+        return loading_window
+    
+    def finish_model_selection(self, model, success, loading_window):
+        """Finish the model selection process."""
+        # Close loading window
+        loading_window.destroy()
+        
+        if success:
+            # Update the active model display
+            self.set_active_model(model)
+            
+            # Notify chat window to refresh model status
+            if hasattr(self.app, 'chat_window') and self.app.chat_window:
+                self.app.chat_window.refresh_model_status()
+            
+            print(f"✅ Model selected: {model['display_name']}")
+            self.show_message("Model Selected", f"Model '{model['display_name']}' is now active!")
+        else:
+            print(f"❌ Failed to load model: {model['display_name']}")
+            self.show_message("Model Loading Error", 
+                           f"Failed to load model '{model['display_name']}'. This might be due to:\n"
+                           f"• Missing model files\n"
+                           f"• Insufficient memory\n"
+                           f"• Incompatible model architecture\n"
+                           f"• Missing dependencies\n\n"
+                           f"Check the console for detailed error messages.")
     
     def show_message(self, title: str, message: str):
         """Show a message dialog."""
@@ -220,6 +294,9 @@ class ActiveBody:
         dialog.geometry("350x150")
         dialog.transient(self.app)
         dialog.grab_set()
+        
+        # Center the window
+        center_window(dialog, 350, 150)
         
         label = ctk.CTkLabel(
             dialog,

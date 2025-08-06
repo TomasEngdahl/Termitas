@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
-Settings dialog for Termitas.
-Allows users to configure API key and system prompt.
+Settings Dialog for application configuration
 """
 
 import customtkinter as ctk
-from typing import Optional, Callable
+from config import config
+from ui.core.window_utils import center_window
+from typing import Optional
 
 class SettingsDialog:
-    def __init__(self, parent, api_key: str = "", system_prompt: str = ""):
+    """Dialog for application settings."""
+    
+    def __init__(self, parent):
         self.parent = parent
-        self.api_key = api_key
-        self.system_prompt = system_prompt
-        self.result = None
-        
-        # Create dialog
         self.dialog = ctk.CTkToplevel(parent)
         self.dialog.title("Settings")
-        self.dialog.geometry("600x400")
-        self.dialog.resizable(True, True)
+        self.dialog.geometry("500x400")
+        self.dialog.resizable(False, False)
         
-        # Make dialog modal
+        # Center the dialog
+        center_window(self.dialog, 500, 400)
+        
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
@@ -152,3 +152,14 @@ class SettingsDialog:
         """Show the dialog and return the result."""
         self.dialog.wait_window()
         return self.result 
+
+    def show_help_dialog(self):
+        """Show help dialog."""
+        dialog = ctk.CTkToplevel(self.dialog)
+        dialog.title("Help")
+        dialog.geometry("400x300")
+        dialog.transient(self.dialog)
+        dialog.grab_set()
+        
+        # Center the window
+        center_window(dialog, 400, 300) 
