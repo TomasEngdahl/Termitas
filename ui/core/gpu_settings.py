@@ -114,6 +114,13 @@ class GPUSettingsDialog:
                     device_capability = torch.cuda.get_device_capability(i)
                     status_info += f"Device {i}: {device_name}\n"
                     status_info += f"  CUDA Capability: {device_capability}\n"
+                    
+                    # Check RTX 5090 compatibility
+                    if "RTX 5090" in device_name:
+                        status_info += f"  ⚠️  RTX 5090 detected!\n"
+                        status_info += f"  ⚠️  PyTorch {torch.__version__} only supports up to sm_90\n"
+                        status_info += f"  ⚠️  Your GPU has sm_{device_capability[0]}{device_capability[1]}\n"
+                        status_info += f"  💡 Use CPU fallback or wait for PyTorch 2.8+\n"
                 
                 # Test basic GPU operations
                 try:
@@ -123,6 +130,9 @@ class GPUSettingsDialog:
                     status_info += "\n✅ Basic GPU operations working\n"
                 except Exception as e:
                     status_info += f"\n❌ GPU operations failed: {e}\n"
+                    if "RTX 5090" in str(e):
+                        status_info += f"  💡 This is expected for RTX 5090 with PyTorch 2.7.0\n"
+                        status_info += f"  💡 The app will automatically fall back to CPU\n"
             else:
                 status_info += "\n❌ No CUDA devices found\n"
             

@@ -90,6 +90,11 @@ Be conversational and helpful in your responses.
                     except Exception as e:
                         print(f"⚠️ {self.device.upper()} loading failed: {e}")
                         
+                        # Check if it's an RTX 5090 compatibility issue
+                        if "RTX 5090" in str(e) or "sm_120" in str(e):
+                            print(f"💡 RTX 5090 detected - PyTorch 2.7.0 doesn't support sm_120")
+                            print(f"💡 This is expected behavior, falling back to CPU")
+                        
                         # Fallback to CPU if GPU failed
                         if self.device == "cuda":
                             print(f"🔄 Falling back to CPU...")
