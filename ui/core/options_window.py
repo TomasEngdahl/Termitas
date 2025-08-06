@@ -39,4 +39,6 @@ class OptionsWindow:
         self.list_models = ListModels(self.app, self.browser_frame)
         # Pass reference to the outer frame so it can change packing behavior
         self.list_models.outer_frame = self.browser_frame
+        # Pass reference to downloaded models for refresh notifications
+        self.list_models.downloaded_body = self.downloaded_body
         self.list_models.create_list_models()

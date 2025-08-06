@@ -1,33 +1,42 @@
-from huggingface_hub import list_models, ModelInfo
+from huggingface_hub import list_models, ModelInfo, list_repo_files
 from typing import List
+import asyncio
 
-def list_models_hf(limit: int = 20, filter_for_coding: bool = False, search_term: str = "") -> List[ModelInfo]:
-    """List models from Hugging Face Hub with flexible search options."""
+def list_models_hf(limit: int = 20, filter_for_coding: bool = False, search_term: str = "", only_open: bool = True) -> List[ModelInfo]:
+    """List models from Hugging Face Hub with optimized PyTorch filtering."""
     try:
         if search_term:
-            # Direct search with user's term
+            # Direct search with user's term - use HF's built-in filtering
             try:
+                # Search for models with PyTorch files using HF's filter
                 models_generator = list_models(
                     search=search_term,
                     sort="downloads", 
                     direction=-1,
-                    limit=limit * 2
+                    limit=limit * 2,  # Reduced since we're pre-filtering
+                    filter="pytorch"  # Use HF's built-in PyTorch filter
                 )
                 models = list(models_generator)
+                
+                # Filter out gated models if requested
+                if only_open:
+                    models = [m for m in models if not is_gated_model(m)]
+                
                 return models[:limit]
             except Exception as e:
                 print(f"Search failed: {e}")
                 return []
                 
         elif filter_for_coding:
-            # Legacy coding filter (keeping for compatibility)
+            # Legacy coding filter with optimized PyTorch filtering
             try:
                 models_generator = list_models(
                     task="text-generation",
                     search="qwen OR mistral OR llama OR code OR coding OR instruct OR chat",
                     sort="downloads", 
                     direction=-1,
-                    limit=limit * 2
+                    limit=limit * 2,
+                    filter="pytorch"  # Use HF's built-in PyTorch filter
                 )
                 models = list(models_generator)
             except:
@@ -35,9 +44,14 @@ def list_models_hf(limit: int = 20, filter_for_coding: bool = False, search_term
                 models_generator = list_models(
                     sort="downloads", 
                     direction=-1,
-                    limit=limit * 3
+                    limit=limit * 2,
+                    filter="pytorch"  # Use HF's built-in PyTorch filter
                 )
                 models = list(models_generator)
+                
+            # Filter out gated models first if requested
+            if only_open:
+                models = [m for m in models if not is_gated_model(m)]
                 
             # Filter the results (more inclusive now)
             filtered_models = []
@@ -57,14 +71,20 @@ def list_models_hf(limit: int = 20, filter_for_coding: bool = False, search_term
                         
             return filtered_models
         else:
-            # General popular models
+            # General popular models with PyTorch filter
             models_generator = list_models(
                 sort="downloads", 
                 direction=-1,
-                limit=limit * 2
+                limit=limit * 2,  # Reduced since we're pre-filtering
+                filter="pytorch"  # Use HF's built-in PyTorch filter
             )
             models = list(models_generator)
-            return models[:limit]
+            
+            # Filter out gated models if requested
+            if only_open:
+                models = [m for m in models if not is_gated_model(m)]
+                
+        return models[:limit]
         
     except ImportError as e:
         print(f"Import Error - huggingface_hub not installed properly: {e}")
@@ -72,6 +92,34 @@ def list_models_hf(limit: int = 20, filter_for_coding: bool = False, search_term
     except Exception as e:
         print(f"Error listing models: {e}")
         return []
+
+def filter_pytorch_models(models: List[ModelInfo]) -> List[ModelInfo]:
+    """Filter models to only include those with PyTorch files - OPTIMIZED VERSION."""
+    # Since we're now using HF's built-in PyTorch filter, this function
+    # should rarely be called, but we keep it for compatibility
+    pytorch_models = []
+    
+    for model in models:
+        try:
+            # Quick check - if model has PyTorch in tags, it's likely compatible
+            tags = [tag.lower() for tag in (model.tags or [])]
+            if any('pytorch' in tag for tag in tags):
+                pytorch_models.append(model)
+                continue
+                
+            # Only check files if we really need to (fallback)
+            files = list_repo_files(model.modelId)
+            pytorch_files = [f for f in files if f.endswith(('.bin', '.safetensors', '.pth'))]
+            
+            if pytorch_files:
+                pytorch_models.append(model)
+                
+        except Exception as e:
+            print(f"⚠️ Error checking PyTorch files for {model.modelId}: {e}")
+            continue
+    
+    print(f"📊 Filtered to {len(pytorch_models)} PyTorch models out of {len(models)} total")
+    return pytorch_models
 
 def is_coding_model(model: ModelInfo) -> bool:
     """Check if a model is suitable for coding/terminal tasks."""
@@ -123,6 +171,38 @@ def is_popular_model(model: ModelInfo) -> bool:
         # Check if model contains any popular family name
         return any(family in model_name for family in popular_families)
     except:
+        return False
+
+def is_gated_model(model: ModelInfo) -> bool:
+    """Check if a model is gated (requires authentication)."""
+    try:
+        # Check if model has gated attribute (available in newer versions)
+        if hasattr(model, 'gated') and model.gated:
+            return True
+            
+        # Check common gated model patterns
+        model_id = model.modelId.lower()
+        gated_patterns = {
+            'meta-llama',  # Most Llama models are gated
+            'mistralai/mistral-7b-instruct',  # Official Mistral models often gated
+            'microsoft/dialogpt-large',  # Large models often gated
+            'openai-gpt',  # OpenAI models
+            'anthropic/',  # Anthropic models
+        }
+        
+        # Check if any gated pattern matches
+        if any(pattern in model_id for pattern in gated_patterns):
+            return True
+            
+        # Check tags for gated indicators
+        tags = getattr(model, 'tags', []) or []
+        gated_tags = {'gated', 'license-required', 'restricted'}
+        if any(tag in gated_tags for tag in tags):
+            return True
+            
+        return False
+    except:
+        # If we can't determine, assume it's open to avoid false positives
         return False
 
 def format_model_size(param_count) -> str:
