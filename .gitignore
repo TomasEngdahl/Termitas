@@ -192,3 +192,51 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Model files and directories
+models/
+*.bin
+*.safetensors
+*.gguf
+*.ggml
+*.model
+*.ckpt
+*.pth
+*.pt
+*.pkl
+*.pickle
+
+# Downloaded model files
+downloads/
+cache/
+*.cache
+
+# Hugging Face cache
+.cache/
+huggingface/
+
+# Model checkpoints and weights
+checkpoints/
+weights/
+saved_models/
+
+# Large data files
+*.h5
+*.hdf5
+*.npz
+*.npy
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
