@@ -7,7 +7,8 @@ A modern AI-powered chat application that runs powerful language models locally 
 - **🤖 Local AI Models** - Run powerful language models locally with PyTorch
 - **💬 Intelligent Chat** - Natural conversations with AI assistants
 - **🔍 Model Browser** - Search and download models from Hugging Face
-- **⚡ GPU Acceleration** - Automatic CUDA/MPS detection and optimization
+- **⚡ GPU Acceleration** - Automatic CUDA/MPS detection with fallback to CPU
+- **🔧 GPU Settings** - Built-in PyTorch installation and configuration
 - **📦 Easy Packaging** - Create standalone executables for distribution
 - **💾 Chat History** - Save and manage conversation sessions
 - **🎨 Modern UI** - Clean, responsive interface built with CustomTkinter
@@ -118,18 +119,34 @@ What specific function would you like to create?
 
 ## 🔧 Configuration
 
-### GPU Setup
+### GPU Support
 
-The application automatically detects and uses:
-- **NVIDIA CUDA** - For NVIDIA GPUs
+The application includes built-in GPU support with automatic detection:
+
+#### **Automatic GPU Detection**
+- **NVIDIA CUDA** - For NVIDIA GPUs (RTX, GTX, etc.)
 - **Apple MPS** - For Apple Silicon Macs
-- **CPU Fallback** - When GPU is not available
+- **CPU Fallback** - Automatic fallback when GPU is unavailable
+
+#### **GPU Settings Dialog**
+Access via the "⚙️ GPU Settings" button in the options panel:
+- **GPU Status Check** - View your GPU and PyTorch configuration
+- **One-Click Installation** - Install PyTorch with CUDA support
+- **Nightly Builds** - For latest GPUs like RTX 5090
+- **CPU-Only Option** - For systems without GPU
+
+#### **Supported GPUs**
+- **RTX 40 Series** - Full support with CUDA
+- **RTX 30 Series** - Full support with CUDA
+- **RTX 5090** - Requires nightly PyTorch build
+- **GTX Series** - Limited support (older models)
+- **Apple Silicon** - MPS acceleration
 
 ### Memory Optimization
 
-- **4-bit Quantization** - Reduces memory usage by 75%
-- **torch.compile()** - 30-50% faster inference
-- **Smart Loading** - Models loaded on demand
+- **Smart Device Mapping** - Automatic GPU/CPU allocation
+- **Low Memory Usage** - Optimized for desktop systems
+- **Fallback System** - Graceful degradation to CPU
 
 ## 📦 Building Executables
 

@@ -3,6 +3,7 @@ from config import config
 from ui.models.active import ActiveBody
 from ui.models.downloaded import DownloadedBody
 from ui.models.list_models import ListModels
+from ui.core.gpu_settings import GPUSettingsDialog
 
 class OptionsWindow:
     def __init__(self, app: ctk.CTk, frame: ctk.CTkFrame):
@@ -42,3 +43,18 @@ class OptionsWindow:
         # Pass reference to downloaded models for refresh notifications
         self.list_models.downloaded_body = self.downloaded_body
         self.list_models.create_list_models()
+        
+        # GPU Settings Button
+        self.gpu_button = ctk.CTkButton(
+            self.frame,
+            text="⚙️ GPU Settings",
+            command=self.open_gpu_settings,
+            fg_color="purple",
+            height=30
+        )
+        self.gpu_button.pack(side="bottom", pady=5)
+    
+    def open_gpu_settings(self):
+        """Open GPU settings dialog."""
+        gpu_dialog = GPUSettingsDialog(self.app)
+        gpu_dialog.show()

@@ -16,7 +16,15 @@ class SimpleInference:
         self.model = None
         self.tokenizer = None
         self.current_model_path = None
-        self.device = "cpu"  # Always use CPU for simplicity
+        
+        # Auto-detect best device
+        if torch.cuda.is_available():
+            self.device = "cuda"
+            print(f"🚀 GPU detected: {torch.cuda.get_device_name(0)}")
+        else:
+            self.device = "cpu"
+            print("🚀 Using CPU (no GPU detected)")
+        
         self.lock = Lock()
         
         # General AI assistant system prompt
@@ -66,22 +74,42 @@ Be conversational and helpful in your responses.
                     
                     print(f"🔄 Loading real model...")
                     
-                    # Try minimal loading strategy for CPU
+                    # Try loading with GPU first, then fallback to CPU
                     try:
-                        print(f"🔄 Loading model with minimal settings...")
+                        print(f"🔄 Loading model with {self.device.upper()}...")
                         self.model = AutoModelForCausalLM.from_pretrained(
                             model_path,
                             torch_dtype=torch.float16,
                             trust_remote_code=True,
                             low_cpu_mem_usage=True,
-                            device_map="cpu"
+                            device_map="auto" if self.device == "cuda" else "cpu"
                         )
-                        print(f"✅ Real model loaded successfully")
+                        print(f"✅ Real model loaded successfully on {self.device.upper()}")
                         self.current_model_path = model_path
                         return True
                     except Exception as e:
-                        print(f"⚠️ Real model loading failed: {e}")
-                        return False
+                        print(f"⚠️ {self.device.upper()} loading failed: {e}")
+                        
+                        # Fallback to CPU if GPU failed
+                        if self.device == "cuda":
+                            print(f"🔄 Falling back to CPU...")
+                            try:
+                                self.device = "cpu"
+                                self.model = AutoModelForCausalLM.from_pretrained(
+                                    model_path,
+                                    torch_dtype=torch.float16,
+                                    trust_remote_code=True,
+                                    low_cpu_mem_usage=True,
+                                    device_map="cpu"
+                                )
+                                print(f"✅ Real model loaded successfully on CPU (fallback)")
+                                self.current_model_path = model_path
+                                return True
+                            except Exception as cpu_e:
+                                print(f"⚠️ CPU fallback also failed: {cpu_e}")
+                                return False
+                        else:
+                            return False
                     
                 except Exception as e:
                     print(f"⚠️ Real model loading failed: {e}")
@@ -119,6 +147,10 @@ Be conversational and helpful in your responses.
             # Tokenize input
             inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
             print(f"🔄 Input tokens shape: {inputs['input_ids'].shape}")
+            
+            # Move inputs to device
+            if self.device == "cuda":
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
             # Generate response
             with torch.no_grad():
